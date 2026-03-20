@@ -1,0 +1,490 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import "../styles/dashboard.css";
+import "../styles/donor-dashboard.css";
+import { apiRequest, getAuthToken, logout } from "../utils/api";
+
+function DonorDashboard() {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("currentUser"));
+  const token = getAuthToken();
+
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("overview"); // overview, requests, inventory
+
+  const [name, setName] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [quantityValue, setQuantityValue] = useState("");
+  const [quantityUnit, setQuantityUnit] = useState("kg");
+  const [address, setAddress] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageData, setImageData] = useState("");
+  const [location, setLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [error, setError] = useState("");
+  const [otpInputs, setOtpInputs] = useState({});
+
+  useEffect(() => {
+    if (!user || user.role !== "donor") {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  const loadItems = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await apiRequest("/api/food/donor-items", { token });
+      setItems(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, view]);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      setImagePreview(result);
+      setImageData(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUseLocation = () => {
+    setError("");
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported in this browser.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        setLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => {
+        setIsLocating(false);
+        setError("Unable to fetch location. Please check permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleAddItem = async () => {
+    setError("");
+
+    if (!name.trim() || !expiryDate || !quantityValue || !address.trim()) {
+      setError("Please fill all required fields (name, expiry, quantity, address).");
+      return;
+    }
+
+    const quantity = Number(quantityValue);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setError("Quantity must be greater than 0.");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/food/add", {
+        method: "POST",
+        token,
+        body: {
+          name: name.trim(),
+          quantity,
+          unit: quantityUnit,
+          expiryDate,
+          address: address.trim(),
+          imageUrl: imageData || "",
+          location,
+        },
+      });
+
+      alert("Item added successfully.");
+      
+      setName("");
+      setExpiryDate("");
+      setQuantityValue("");
+      setQuantityUnit("kg");
+      setAddress("");
+      setImagePreview("");
+      setImageData("");
+      
+      loadItems();
+      setView("requests");
+    } catch (err) {
+      setError(err?.message || "Failed to add food item.");
+    }
+  };
+
+  const handleConfirmOtp = async (foodId) => {
+    const otp = otpInputs[foodId];
+    if (!otp) return;
+    try {
+      await apiRequest("/api/food/pickup/verify", {
+        method: "POST",
+        token,
+        body: { foodId, otp },
+      });
+      alert("Donated Successfully.");
+      setOtpInputs((prev) => ({ ...prev, [foodId]: "" }));
+      loadItems();
+    } catch (err) {
+      alert("Invalid OTP");
+    }
+  };
+
+  if (!user || user.role !== "donor") return null;
+
+  const requestsCount = items.filter(it => it.status === "reserved" || it.status === "available").length;
+
+  return (
+    <div className="dash-layout">
+      <aside className="dash-sidebar">
+        <div className="dash-brand">
+          <span className="dot" />
+          <span>Food Value</span>
+        </div>
+
+        <nav className="dash-menu">
+          <button 
+            className={`menu-item ${view === "overview" ? "active" : ""}`} 
+            onClick={() => setView("overview")}>
+            Overview
+          </button>
+          <button 
+            className={`menu-item ${view === "add" ? "active" : ""}`} 
+            onClick={() => setView("add")}>
+            Add Food Items
+          </button>
+          <button 
+            className={`menu-item ${view === "requests" ? "active" : ""}`} 
+            onClick={() => setView("requests")}>
+            Requests {requestsCount > 0 && `(${requestsCount})`}
+          </button>
+          <button 
+            className={`menu-item ${view === "inventory" ? "active" : ""}`} 
+            onClick={() => setView("inventory")}>
+            Inventory
+          </button>
+        </nav>
+
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
+      </aside>
+
+      <main className="dash-main">
+        <header className="dash-header donor-main-header">
+          <div>
+            <h1>Donor dashboard</h1>
+            <p className="dash-subtitle">
+              Add food items, share your location and manage your inventory.
+            </p>
+          </div>
+          <div className="donor-profile-card">
+            <div className="donor-profile-title">Profile</div>
+            <div className="donor-profile-main">{user.name || user.email}</div>
+            {user.mobile && (
+              <div className="donor-profile-sub">Mobile: {user.mobile}</div>
+            )}
+          </div>
+        </header>
+
+        <section className="donor-grid">
+          {view === "overview" && (
+            <div className="dash-card donor-form-card" style={{ gridColumn: "1 / -1", padding: "2.5rem" }}>
+              <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+                <h2 style={{ fontSize: "2.5rem", color: "#1b5e20", marginBottom: "0.5rem" }}>Welcome to Food Value!</h2>
+                <p style={{ fontSize: "1.1rem", color: "#455a64" }}>Empowering communities by connecting surplus nourishment with those who need it most.</p>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "2rem" }}>
+                <div style={{ background: "#f1f8e9", padding: "1.5rem", borderRadius: "12px", border: "1px solid #c5e1a5" }}>
+                  <h3 style={{ fontSize: "1.3rem", color: "#2e7d32", marginBottom: "1rem" }}>Our Mission</h3>
+                  <p style={{ lineHeight: "1.6", color: "#37474f" }}>
+                    We aim to obliterate food waste by instantly bridging the gap between generous donors and waiting receivers. 
+                    Every item you share makes a profound difference in your community, reducing global waste and greenhouse emissions while actively nourishing lives.
+                  </p>
+                </div>
+
+                <div style={{ background: "#e8eaf6", padding: "1.5rem", borderRadius: "12px", border: "1px solid #c5cae9" }}>
+                  <h3 style={{ fontSize: "1.3rem", color: "#283593", marginBottom: "1rem" }}>Why Donating is Important</h3>
+                  <p style={{ lineHeight: "1.6", color: "#37474f" }}>
+                    On average, one-third of all food produced globally goes to waste. When you donate, you ensure that perfectly good meals aren't discarded into landfills. 
+                    You help families save resources and foster a culture of local sustainability and empathy.
+                  </p>
+                </div>
+
+                <div style={{ background: "#fff3e0", padding: "1.5rem", borderRadius: "12px", border: "1px solid #ffe0b2" }}>
+                  <h3 style={{ fontSize: "1.3rem", color: "#e65100", marginBottom: "1rem" }}>How You Can Contribute</h3>
+                  <p style={{ lineHeight: "1.6", color: "#37474f" }}>
+                    1. Go to the <strong>Add Food Items</strong> tab to list your surplus food.<br/>
+                    2. Check your <strong>Requests</strong> tab to see if a receiver has reserved your item.<br/>
+                    3. Verify their <strong>OTP</strong> when they arrive for pickup to successfully complete the donation cycle!
+                  </p>
+                </div>
+
+                <div style={{ background: "#e0f7fa", padding: "1.5rem", borderRadius: "12px", border: "1px solid #b2ebf2" }}>
+                  <h3 style={{ fontSize: "1.3rem", color: "#006064", marginBottom: "1rem" }}>Benefits of Donating</h3>
+                  <p style={{ lineHeight: "1.6", color: "#37474f" }}>
+                    - <strong>Environmental Impact:</strong> Lower your carbon footprint.<br/>
+                    - <strong>Community Building:</strong> Directly impact local hunger.<br/>
+                    - <strong>Transparency:</strong> Our secure OTP and barcode system guarantees your donation safely reaches the intended receiver safely.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === "add" && (
+            <div className="dash-card donor-form-card" style={{ gridColumn: "1 / -1" }}>
+              <h2>Add Food Items</h2>
+              <p className="donor-section-subtitle">
+                Enter product details. A barcode and receiver OTP will be generated
+                automatically.
+              </p>
+
+              {error && <p className="auth-error">{error}</p>}
+
+                <div className="donor-form-grid">
+                  <div className="donor-field-group">
+                    <span className="donor-label">Product name</span>
+                    <input
+                      className="donor-input"
+                      placeholder="e.g. Fresh milk 1L"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="donor-field-group">
+                    <span className="donor-label">Expiry date</span>
+                    <input
+                      className="donor-input"
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="donor-field-group">
+                    <span className="donor-label">Quantity</span>
+                    <div className="donor-quantity-row">
+                      <input
+                        className="donor-input"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="Amount"
+                        value={quantityValue}
+                        onChange={(e) => setQuantityValue(e.target.value)}
+                      />
+                      <select
+                        className="donor-select"
+                        value={quantityUnit}
+                        onChange={(e) => setQuantityUnit(e.target.value)}
+                      >
+                        <option value="kg">KG</option>
+                        <option value="g">Gram</option>
+                        <option value="packet">Packet</option>
+                        <option value="piece">Piece</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="donor-field-group">
+                    <span className="donor-label">Product image</span>
+                    <div className="donor-upload-row">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                      />
+                      {imagePreview && (
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="donor-upload-preview"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="donor-field-group" style={{ gridColumn: "1 / -1" }}>
+                    <span className="donor-label">Pickup address</span>
+                    <textarea
+                      className="donor-textarea"
+                      placeholder="Enter address where the receiver will collect the food."
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="donor-field-group" style={{ gridColumn: "1 / -1" }}>
+                    <span className="donor-label">Share live location (map)</span>
+                    <button
+                      type="button"
+                      className="donor-secondary-btn"
+                      onClick={handleUseLocation}
+                      disabled={isLocating}
+                    >
+                      {isLocating ? "Fetching location…" : "Use my current location"}
+                    </button>
+                    {location && (
+                      <div className="donor-location-map">
+                        <iframe
+                          title="Pickup location"
+                          src={`https://www.google.com/maps?q=${location.lat},${location.lng}&z=15&output=embed`}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="donor-primary-btn full"
+                  onClick={handleAddItem}
+                >
+                  Add food item
+                </button>
+              </div>
+          )}
+
+          {(view === "requests" || view === "inventory") && (
+            <div className="dash-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="donor-inventory-card-header">
+                <div>
+                  <h2>{view === "requests" ? "Pending Requests" : "My Inventory"}</h2>
+                  <p className="donor-section-subtitle">
+                    {view === "requests" 
+                      ? "Items you have added (Available) and items waiting for receiver OTP (Reserved)."
+                      : "Items you have successfully donated (Collected) will appear here."}
+                  </p>
+                </div>
+                <div className="donor-inventory-count">
+                  {loading && "Loading..."}
+                </div>
+              </div>
+
+              <div className="donor-inventory-list">
+                {!loading && items.filter(item => 
+                  view === "requests" ? (item.status === "reserved" || item.status === "available") : item.status === "collected"
+                ).length === 0 && (
+                  <p className="donor-section-subtitle">
+                    No items found in this section.
+                  </p>
+                )}
+
+                {items
+                  .filter(item => 
+                    view === "requests" ? (item.status === "reserved" || item.status === "available") : item.status === "collected"
+                  )
+                  .map((item) => {
+                  const qtyLabel = `${item.quantity} ${item.unit}`;
+                  return (
+                    <div key={item._id} className="donor-item">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="donor-item-image"
+                        />
+                      ) : (
+                        <div className="donor-item-image" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#90a4ae", fontSize: "0.85rem", fontWeight: 600 }}>No Image</div>
+                      )}
+                      
+                      <div className="donor-item-main">
+                        <div className="donor-item-header-row">
+                          <div className="donor-item-name">{item.name}</div>
+                          <div className="donor-item-chip">{qtyLabel}</div>
+                        </div>
+                        
+                        <div className="donor-item-meta">
+                          Expiry: {item.expiryDate ? String(item.expiryDate).slice(0, 10) : "N/A"}
+                        </div>
+                        <div className="donor-item-meta">
+                          Pickup: {item.address || "N/A"}
+                        </div>
+                        
+                        <div className="donor-status-row">
+                          <div className={`donor-status-pill ${item.status === 'collected' ? 'selected' : 'available'}`}>
+                            <span className="donor-status-radio"></span>
+                            {item.status.toUpperCase()}
+                          </div>
+                        </div>
+
+                        {item.status === "collected" && (
+                          <div style={{ marginTop: "10px", padding: "10px", background: "#e8f5e9", borderRadius: "8px", border: "1px solid #c8e6c9" }}>
+                           <p style={{ color: "#2e7d32", fontWeight: "bold", margin: "0 0 4px 0", fontSize: "0.9rem" }}>✓ Donated Successfully</p>
+                           <p style={{ margin: 0, fontSize: "0.85rem", color: "#1b5e20" }}>Receiver ID: {item.collectedBy}</p>
+                           {item.collectedAt && <p style={{ margin: "2px 0 0 0", fontSize: "0.8rem", color: "#388e3c" }}>{new Date(item.collectedAt).toLocaleString()}</p>}
+                          </div>
+                        )}
+
+                        {item.status === "reserved" && (
+                          <div style={{ marginTop: "10px", padding: "10px", background: "#fff3e0", borderRadius: "8px", border: "1px solid #ffe0b2" }}>
+                            <p style={{ margin: "0 0 8px 0", fontSize: "0.85rem", color: "#e65100", fontWeight: "bold" }}>OTP required (Receiver handover)</p>
+                            <div className="donor-otp-row">
+                              <input
+                                className="donor-otp-input"
+                                placeholder="Enter OTP"
+                                value={otpInputs[item._id] || ""}
+                                onChange={(e) =>
+                                  setOtpInputs({ ...otpInputs, [item._id]: e.target.value })
+                                }
+                              />
+                              <button
+                                className="donor-otp-btn"
+                                onClick={() => handleConfirmOtp(item._id)}
+                              >
+                                Verify
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="donor-barcode">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`Name: ${item.name}\nQty: ${item.quantity} ${item.unit}\nExp: ${item.expiryDate ? String(item.expiryDate).slice(0, 10) : "-"}\nDonor: ${user.name || user.email}\nAddress: ${item.address || "N/A"}\nStatus: ${item.status.toUpperCase()}`)}`}
+                          alt="QR Code"
+                        />
+                        <div className="donor-barcode-code">ID: {item.barcode}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+export default DonorDashboard;
