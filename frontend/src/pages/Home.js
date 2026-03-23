@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import "../styles/home.css";
+import logo from "../assets/sanjeevani.jpeg";
 
 function Home() {
   return (
@@ -7,7 +8,8 @@ function Home() {
       <nav className="home-nav">
         <div className="home-logo">
           <img
-            src="https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+            // src="https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+            src={logo}
             alt="Food Value Platform"
           />
           <span>Food Value Platform</span>

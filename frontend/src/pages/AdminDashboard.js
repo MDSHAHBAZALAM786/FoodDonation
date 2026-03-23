@@ -17,8 +17,14 @@ function AdminDashboard() {
   const [logs, setLogs] = useState({ added: [], reserved: [], collected: [] });
   const [reportDate, setReportDate] = useState("");
   const [reportType, setReportType] = useState("all");
+  const [reportPage, setReportPage] = useState(1);
+  const [reportItemsPerPage, setReportItemsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setReportPage(1);
+  }, [reportType, reportDate]);
 
   useEffect(() => {
     if (!user || user.role !== "admin") navigate("/");
@@ -104,6 +110,69 @@ function AdminDashboard() {
     () => allStock.filter((i) => i.status === "collected"),
     [allStock]
   );
+
+  const reportsFilteredRows = useMemo(() => {
+    let rows = [];
+
+    if (reportType === "all" || reportType === "added") {
+      logs.added.forEach(item => {
+        const d = item.addedAt ? new Date(item.addedAt) : null;
+        if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
+          rows.push({
+            type: "Added", 
+            color: "#1976d2", bg: "#e3f2fd",
+            name: item.foodId?.name || "Deleted Item",
+            donor: item.donorId?.email || "Unknown",
+            receiver: "-",
+            date: d,
+            ms: d ? d.getTime() : 0,
+          });
+        }
+      });
+    }
+
+    if (reportType === "all" || reportType === "reserved") {
+      logs.reserved.forEach(item => {
+        const d = item.reservedAt ? new Date(item.reservedAt) : null;
+        if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
+          rows.push({
+            type: "Reserved",
+            color: "#ed6c02", bg: "#fff3e0",
+            name: item.foodId?.name || "Deleted Item",
+            donor: item.donorId?.email || "Unknown",
+            receiver: item.receiverId?.email || "Unknown",
+            date: d,
+            ms: d ? d.getTime() : 0,
+          });
+        }
+      });
+    }
+
+    if (reportType === "all" || reportType === "collected") {
+      logs.collected.forEach(item => {
+        const d = item.collectedAt ? new Date(item.collectedAt) : null;
+        if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
+          rows.push({
+            type: "Delivered",
+            color: "#2e7d32", bg: "#e8f5e9",
+            name: item.foodId?.name || "Deleted Item",
+            donor: item.donorId?.email || "Unknown",
+            receiver: item.receiverId?.email || "Unknown",
+            date: d,
+            ms: d ? d.getTime() : 0,
+          });
+        }
+      });
+    }
+
+    rows.sort((a, b) => b.ms - a.ms);
+    return rows;
+  }, [logs, reportType, reportDate]);
+
+  const reportTotalItems = reportsFilteredRows.length;
+  const reportTotalPages = Math.ceil(reportTotalItems / reportItemsPerPage) || 1;
+  const reportStartIdx = (reportPage - 1) * reportItemsPerPage;
+  const currentReportRows = reportsFilteredRows.slice(reportStartIdx, reportStartIdx + reportItemsPerPage);
 
   if (!user || user.role !== "admin") return null;
 
@@ -389,74 +458,15 @@ function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => {
-                        let rows = [];
-
-                        if (reportType === "all" || reportType === "added") {
-                          logs.added.forEach(item => {
-                            const d = item.addedAt ? new Date(item.addedAt) : null;
-                            if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
-                              rows.push({
-                                type: "Added", 
-                                color: "#1976d2", bg: "#e3f2fd",
-                                name: item.foodId?.name || "Deleted Item",
-                                donor: item.donorId?.email || "Unknown",
-                                receiver: "-",
-                                date: d,
-                                ms: d ? d.getTime() : 0,
-                              });
-                            }
-                          });
-                        }
-
-                        if (reportType === "all" || reportType === "reserved") {
-                          logs.reserved.forEach(item => {
-                            const d = item.reservedAt ? new Date(item.reservedAt) : null;
-                            if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
-                              rows.push({
-                                type: "Reserved",
-                                color: "#ed6c02", bg: "#fff3e0",
-                                name: item.foodId?.name || "Deleted Item",
-                                donor: item.donorId?.email || "Unknown",
-                                receiver: item.receiverId?.email || "Unknown",
-                                date: d,
-                                ms: d ? d.getTime() : 0,
-                              });
-                            }
-                          });
-                        }
-
-                        if (reportType === "all" || reportType === "collected") {
-                          logs.collected.forEach(item => {
-                            const d = item.collectedAt ? new Date(item.collectedAt) : null;
-                            if (!reportDate || (d && d.toISOString().slice(0, 10) === reportDate)) {
-                              rows.push({
-                                type: "Delivered",
-                                color: "#2e7d32", bg: "#e8f5e9",
-                                name: item.foodId?.name || "Deleted Item",
-                                donor: item.donorId?.email || "Unknown",
-                                receiver: item.receiverId?.email || "Unknown",
-                                date: d,
-                                ms: d ? d.getTime() : 0,
-                              });
-                            }
-                          });
-                        }
-
-                        rows.sort((a, b) => b.ms - a.ms);
-
-                        if (rows.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan="5" style={{ padding: "2rem", textAlign: "center", color: "#90a4ae" }}>
-                                No records found for the selected criteria.
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return rows.map((r, i) => (
-                          <tr key={i} style={{ borderBottom: "1px solid #eceff1" }}>
+                      {reportTotalItems === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ padding: "2rem", textAlign: "center", color: "#90a4ae" }}>
+                            No records found for the selected criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        currentReportRows.map((r, i) => (
+                          <tr key={reportStartIdx + i} style={{ borderBottom: "1px solid #eceff1" }}>
                             <td style={{ padding: "12px 16px" }}>
                               <span style={{ display: "inline-block", padding: "4px 8px", background: r.bg, color: r.color, borderRadius: "6px", fontSize: "0.8rem", fontWeight: "bold" }}>
                                 {r.type}
@@ -467,11 +477,71 @@ function AdminDashboard() {
                             <td style={{ padding: "12px 16px", color: "#546e7a" }}>{r.receiver}</td>
                             <td style={{ padding: "12px 16px", color: "#607d8b" }}>{r.date ? r.date.toLocaleString() : "N/A"}</td>
                           </tr>
-                        ));
-                      })()}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
+
+                {reportTotalItems > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", padding: "16px 8px 0px", fontSize: "0.85rem", color: "#555" }}>
+                    <div style={{ marginRight: "32px", display: "flex", alignItems: "center" }}>
+                      <span>Items per page:</span>
+                      <select 
+                        value={reportItemsPerPage} 
+                        onChange={(e) => {
+                          setReportItemsPerPage(Number(e.target.value));
+                          setReportPage(1);
+                        }}
+                        style={{ marginLeft: "8px", border: "none", outline: "none", background: "transparent", color: "#555", cursor: "pointer", fontSize: "0.85rem", borderBottom: "1px solid #ccc", padding: "2px 0" }}
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+                    
+                    <div style={{ marginRight: "32px" }}>
+                      {reportStartIdx + 1} - {Math.min(reportStartIdx + reportItemsPerPage, reportTotalItems)} of {reportTotalItems}
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                      <button 
+                        onClick={() => setReportPage(1)} 
+                        disabled={reportPage === 1}
+                        style={{ background: "none", border: "none", cursor: reportPage === 1 ? "default" : "pointer", opacity: reportPage === 1 ? 0.3 : 1, fontSize: "1rem", color: "#555", padding: 0 }}
+                        title="First Page"
+                      >
+                        |&lt;&lt;
+                      </button>
+                      <button 
+                        onClick={() => setReportPage(prev => Math.max(prev - 1, 1))} 
+                        disabled={reportPage === 1}
+                        style={{ background: "none", border: "none", cursor: reportPage === 1 ? "default" : "pointer", opacity: reportPage === 1 ? 0.3 : 1, fontSize: "1rem", color: "#555", padding: 0 }}
+                        title="Previous Page"
+                      >
+                        &lt;
+                      </button>
+                      <button 
+                        onClick={() => setReportPage(prev => Math.min(prev + 1, reportTotalPages))} 
+                        disabled={reportPage === reportTotalPages}
+                        style={{ background: "none", border: "none", cursor: reportPage === reportTotalPages ? "default" : "pointer", opacity: reportPage === reportTotalPages ? 0.3 : 1, fontSize: "1rem", color: "#555", padding: 0 }}
+                        title="Next Page"
+                      >
+                        &gt;
+                      </button>
+                      <button 
+                        onClick={() => setReportPage(reportTotalPages)} 
+                        disabled={reportPage === reportTotalPages}
+                        style={{ background: "none", border: "none", cursor: reportPage === reportTotalPages ? "default" : "pointer", opacity: reportPage === reportTotalPages ? 0.3 : 1, fontSize: "1rem", color: "#555", padding: 0 }}
+                        title="Last Page"
+                      >
+                        &gt;&gt;|
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>
