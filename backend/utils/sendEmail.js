@@ -1,14 +1,11 @@
 const nodemailer = require('nodemailer');
-const dns = require('dns');
-
-// Force IPv4 because Render free tiers often have IPv6 routing issues
-dns.setDefaultResultOrder('ipv4first');
 
 const sendEmail = async (options) => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
+    family: 4, // Forces Node to use IPv4 only, fixing Render's ENETUNREACH IPv6 issue
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
