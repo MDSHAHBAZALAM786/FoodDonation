@@ -1,4 +1,8 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 because Render free tiers often have IPv6 routing issues
+dns.setDefaultResultOrder('ipv4first');
 
 const sendEmail = async (options) => {
   const transporter = nodemailer.createTransport({
