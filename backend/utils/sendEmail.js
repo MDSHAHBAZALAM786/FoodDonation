@@ -1,25 +1,17 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (options) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "sandbox.smtp.mailtrap.io",
-      port: 2525,
-      auth: {
-        user: process.env.MAILTRAP_USER,
-        pass: process.env.MAILTRAP_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: "Sanjeevani <test@mailtrap.io>",
+    await resend.emails.send({
+      from: 'Sanjeevani <onboarding@resend.dev>',
       to: options.email,
       subject: options.subject,
-      text: options.message,
-    };
+      html: `<h2>${options.message}</h2>`
+    });
 
-    await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent (Mailtrap)");
+    console.log("✅ Email sent via Resend");
 
   } catch (error) {
     console.error("❌ Email error:", error);
