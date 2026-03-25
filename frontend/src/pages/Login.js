@@ -12,6 +12,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [fpStep, setFpStep] = useState(1);
@@ -54,6 +55,8 @@ function Login() {
       else navigate("/donor-dashboard");
     } catch (err) {
       setError(err?.message || "Login failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,6 +67,7 @@ function Login() {
       setError("Please enter your email to reset password.");
       return;
     }
+    setLoading(true);
     try {
       const resp = await apiRequest("/api/auth/forgot-password", {
         method: "POST",
@@ -73,6 +77,8 @@ function Login() {
       setFpStep(2);
     } catch (err) {
       setError(err?.message || "Failed to initiate password reset.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,6 +93,7 @@ function Login() {
       setError("Password must be at least 8 characters.");
       return;
     }
+    setLoading(true);
     try {
       const resp = await apiRequest("/api/auth/reset-password", {
         method: "POST",
@@ -100,6 +107,8 @@ function Login() {
       setPassword("");
     } catch (err) {
       setError(err?.message || "Password reset failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,8 +171,8 @@ function Login() {
               </button>
             </div>
 
-            <button className="submit-btn" onClick={handleLogin}>
-              LOGIN TO YOUR ACCOUNT
+            <button className="submit-btn" onClick={handleLogin} disabled={loading}>
+              {loading ? "LOGGING IN..." : "LOGIN TO YOUR ACCOUNT"}
             </button>
 
             <p className="auth-switch-text">
@@ -191,8 +200,8 @@ function Login() {
             </div>
 
             {fpStep === 1 ? (
-              <button className="submit-btn" onClick={handleForgotPasswordStep1}>
-                SEND OTP
+              <button className="submit-btn" onClick={handleForgotPasswordStep1} disabled={loading}>
+                {loading ? "SENDING..." : "SEND OTP"}
               </button>
             ) : (
               <>
@@ -215,8 +224,8 @@ function Login() {
                     onChange={(e) => setFpNewPassword(e.target.value)}
                   />
                 </div>
-                <button className="submit-btn" onClick={handleForgotPasswordStep2}>
-                  RESET PASSWORD
+                <button className="submit-btn" onClick={handleForgotPasswordStep2} disabled={loading}>
+                  {loading ? "RESETTING..." : "RESET PASSWORD"}
                 </button>
               </>
             )}

@@ -18,7 +18,6 @@ router.post('/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const mobileOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
     const user = await User.create({
       name: name || "",
@@ -26,36 +25,14 @@ router.post('/register', async (req, res) => {
       mobile,
       password: hashedPassword,
       role: role || "receiver",
-      isVerified: false,
-      mobileOtp
     });
 
-    console.log(`\n\n[SIMULATING SMS] To Mobile: ${mobile} -> Your Verify OTP is ${mobileOtp}\n\n`);
-
-    return res.json({ message: "Please verify your mobile number. OTP sent.", id: user._id, email });
+    return res.json({ message: "User registered successfully", id: user._id });
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({ message: "Email already exists" });
     }
     return res.status(500).json({ message: "Registration failed" });
-  }
-});
-
-router.post('/verify-mobile', async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) return res.status(400).json({ message: "Email and OTP are required" });
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found" });
-    if (user.mobileOtp !== otp) return res.status(400).json({ message: "Invalid OTP" });
-
-    user.isVerified = true;
-    user.mobileOtp = undefined;
-    await user.save();
-    return res.json({ message: "Mobile verified successfully" });
-  } catch(err) {
-    return res.status(500).json({ message: "Verification failed" });
   }
 });
 
@@ -82,10 +59,6 @@ router.post('/login', async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
-
-    if (user.isVerified === false) {
-      return res.status(403).json({ message: "Please verify your mobile number first", email: user.email });
-    }
 
     const token = jwt.sign(
       { id: user._id, role: user.role, email: user.email },

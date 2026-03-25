@@ -15,8 +15,7 @@ function Signup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [step, setStep] = useState(1);
-  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const mobileRegex = /^[0-9]{10}$/;
@@ -49,8 +48,9 @@ function Signup() {
       return;
     }
 
+    setLoading(true);
     try {
-      const resp = await apiRequest("/api/auth/register", {
+      await apiRequest("/api/auth/register", {
         method: "POST",
         body: {
           name,
@@ -61,27 +61,7 @@ function Signup() {
         },
       });
 
-      setStep(2);
-      setError(""); // clear error on success
-      alert(resp.message || "OTP sent directly to the console for simulation.");
-    } catch (err) {
-      setError(err?.message || "Signup failed");
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    setError("");
-    if (!otp) {
-      setError("Please enter the OTP.");
-      return;
-    }
-    try {
-      await apiRequest("/api/auth/verify-mobile", {
-        method: "POST",
-        body: { email, otp },
-      });
-
-      // Auto-login after successful verification
+      // Auto-login after successful signup
       const data = await apiRequest("/api/auth/login", {
         method: "POST",
         body: { email, password },
@@ -100,7 +80,9 @@ function Signup() {
       else if (data.role === "receiver") navigate("/receiver-dashboard");
       else navigate("/donor-dashboard");
     } catch (err) {
-      setError(err?.message || "OTP Verification failed");
+      setError(err?.message || "Signup failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -118,99 +100,79 @@ function Signup() {
 
         {error && <p className="auth-error">{error}</p>}
 
-        {step === 1 ? (
-          <>
-            <div className="input-group">
-              <FaUser className="icon" />
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+        <div className="input-group">
+          <FaUser className="icon" />
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
 
-            <div className="input-group">
-              <FaEnvelope className="icon" />
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+        <div className="input-group">
+          <FaEnvelope className="icon" />
+          <input
+            type="email"
+            placeholder="Email Address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
 
-            <div className="input-group">
-              <FaLock className="icon" />
-              <input
-                type="tel"
-                placeholder="Mobile Number"
-                value={mobile}
-                maxLength="10"
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setMobile(val);
-                }}
-              />
-            </div>
+        <div className="input-group">
+          <FaLock className="icon" />
+          <input
+            type="tel"
+            placeholder="Mobile Number"
+            value={mobile}
+            maxLength="10"
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              setMobile(val);
+            }}
+          />
+        </div>
 
-            <div className="role-buttons">
-              <button
-                className={role === "donor" ? "active" : ""}
-                onClick={() => setRole("donor")}
-              >
-                Donor
-              </button>
+        <div className="role-buttons">
+          <button
+            className={role === "donor" ? "active" : ""}
+            onClick={() => setRole("donor")}
+          >
+            Donor
+          </button>
 
-              <button
-                className={role === "receiver" ? "active" : ""}
-                onClick={() => setRole("receiver")}
-              >
-                Receiver
-              </button>
-            </div>
+          <button
+            className={role === "receiver" ? "active" : ""}
+            onClick={() => setRole("receiver")}
+          >
+            Receiver
+          </button>
+        </div>
 
-            <div className="input-group">
-              <FaLock className="icon" />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+        <div className="input-group">
+          <FaLock className="icon" />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-            <div className="input-group">
-              <FaLock className="icon" />
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
+        <div className="input-group">
+          <FaLock className="icon" />
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </div>
 
-            <button className="submit-btn" onClick={handleSignup}>
-              CREATE NEW ACCOUNT
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="input-group">
-              <FaLock className="icon" />
-              <input
-                type="text"
-                placeholder="Enter 6-digit Mobile OTP"
-                value={otp}
-                maxLength="6"
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              />
-            </div>
-            <button className="submit-btn" onClick={handleVerifyOtp}>
-              VERIFY & LOGIN
-            </button>
-          </>
-        )}
+        <button className="submit-btn" onClick={handleSignup} disabled={loading}>
+          {loading ? "CREATING ACCOUNT..." : "CREATE NEW ACCOUNT"}
+        </button>
 
         <p className="auth-switch-text">
           Already have an account?{" "}
