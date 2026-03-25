@@ -1,32 +1,25 @@
 const nodemailer = require('nodemailer');
-const dns = require('dns');
-
-dns.setDefaultResultOrder('ipv4first');
 
 const sendEmail = async (options) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
+      host: "sandbox.smtp.mailtrap.io",
+      port: 2525,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.MAILTRAP_USER,
+        pass: process.env.MAILTRAP_PASS,
       },
-      tls: {
-        rejectUnauthorized: false
-      }
     });
 
     const mailOptions = {
-      from: `"Food Value Platform" <${process.env.EMAIL_USER}>`,
+      from: "Sanjeevani <test@mailtrap.io>",
       to: options.email,
       subject: options.subject,
       text: options.message,
     };
 
     await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully");
+    console.log("✅ Email sent (Mailtrap)");
 
   } catch (error) {
     console.error("❌ Email error:", error);
