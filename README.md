@@ -8,7 +8,7 @@ The Food Waste Management System Website is a web-based platform designed to red
 This website allows donors to add food items, receivers to collect food, and admin to monitor all activities using a dashboard.
 The system stores all food records in a database and ensures secure collection using OTP verification.
 
-The project is designed using proper:
+The Project is designed using proper:
 
 ER Diagram
 DFD (Level 0, Level 1, Level 2)
