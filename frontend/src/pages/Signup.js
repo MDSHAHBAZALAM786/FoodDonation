@@ -15,6 +15,7 @@ function Signup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const mobileRegex = /^[0-9]{10}$/;
@@ -47,6 +48,7 @@ function Signup() {
       return;
     }
 
+    setLoading(true);
     try {
       await apiRequest("/api/auth/register", {
         method: "POST",
@@ -79,6 +81,8 @@ function Signup() {
       else navigate("/donor-dashboard");
     } catch (err) {
       setError(err?.message || "Signup failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -122,7 +126,11 @@ function Signup() {
             type="tel"
             placeholder="Mobile Number"
             value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
+            maxLength="10"
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              setMobile(val);
+            }}
           />
         </div>
 
@@ -162,8 +170,8 @@ function Signup() {
           />
         </div>
 
-        <button className="submit-btn" onClick={handleSignup}>
-          CREATE NEW ACCOUNT
+        <button className="submit-btn" onClick={handleSignup} disabled={loading}>
+          {loading ? "CREATING ACCOUNT..." : "CREATE NEW ACCOUNT"}
         </button>
 
         <p className="auth-switch-text">
